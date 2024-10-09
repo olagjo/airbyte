@@ -2,6 +2,7 @@
 package io.airbyte.cdk
 
 import io.airbyte.cdk.command.ConnectorCommandLinePropertySource
+import io.airbyte.cdk.command.FeatureFlag
 import io.airbyte.cdk.command.MetadataYamlPropertySource
 import io.micronaut.configuration.picocli.MicronautFactory
 import io.micronaut.context.ApplicationContext
@@ -58,7 +59,10 @@ sealed class AirbyteConnectorRunner(
     val testBeanDefinitions: Array<out RuntimeBeanDefinition<*>>,
     val testProperties: Map<String, String> = emptyMap(),
 ) {
-    val envs: Array<String> = arrayOf(Environment.CLI, connectorType)
+
+    val envs: Array<String> =
+        arrayOf(Environment.CLI, connectorType) +
+            FeatureFlag.active(System.getenv()).map { it.micronautEnvironmentName }
 
     inline fun <reified R : Runnable> run() {
         val picocliCommandLineFactory = PicocliCommandLineFactory(this)
