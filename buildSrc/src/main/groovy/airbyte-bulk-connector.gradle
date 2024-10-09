@@ -131,7 +131,8 @@ class AirbyteBulkConnectorPlugin implements Plugin<Project> {
         }
 
         project.sourceSets {
-            integrationTestJava {
+            // This is the source set where most of our integration tests should live.
+            integrationTest {
                 kotlin {
                     srcDir 'src/test-integration/kotlin'
                 }
@@ -143,6 +144,16 @@ class AirbyteBulkConnectorPlugin implements Plugin<Project> {
                     include 'metadata.yaml'
                 }
             }
+            // This source set should only be used for tests based on the old CDK's test classes,
+            // in particular DestinationAcceptanceTest / BaseTypingDedupingTest.
+            integrationTestLegacy {
+                kotlin {
+                    srcDir 'src/test-integration-legacy/kotlin'
+                }
+                resources {
+                    srcDir 'src/test-integration-legacy/resources'
+                }
+            }
         }
         project.tasks.named('spotbugsTest').configure {
             enabled = false
@@ -152,15 +163,51 @@ class AirbyteBulkConnectorPlugin implements Plugin<Project> {
             dependsOn project.tasks.matching { it.name ==~ /(compile|spotbugs)[a-zA-Z]*Java/ }
         }
 
-        project.tasks.register('integrationTestJava', Test) {
-            description = 'Runs the integration tests.'
+        // This task exists solely so that we can run the "modern" integration tests
+        // in non-docker mode on our laptops.
+        // It's not a dependency of any other task.
+        project.tasks.register('integrationTestNonDocker', Test) {
+            description = 'Runs the integration tests in non-docker mode.'
             group = 'verification'
-            testClassesDirs = project.sourceSets.integrationTestJava.output.classesDirs
-            classpath = project.sourceSets.integrationTestJava.runtimeClasspath
+            testClassesDirs = project.sourceSets.integrationTest.output.classesDirs
+            classpath = project.sourceSets.integrationTest.runtimeClasspath
             useJUnitPlatform()
             mustRunAfter project.tasks.check
         }
+        // This task runs the "modern" integration tests in docker mode.
+        // It's intended for use in CI.
+        project.tasks.register('integrationTestDocker', Test) {
+            description = 'Runs the integration tests in docker mode.'
+            group = 'verification'
+            testClassesDirs = project.sourceSets.integrationTest.output.classesDirs
+            classpath = project.sourceSets.integrationTest.runtimeClasspath
+            useJUnitPlatform()
+            mustRunAfter project.tasks.check
+            // We need a docker image to run this task, so depend on assemble
+            dependsOn project.tasks.assemble
+            environment "MICRONAUT_ENVIRONMENTS", "DOCKERIZED_INTEGRATION_TEST"
+        }
+        // This task runs the legacy integration tests (these tests always require docker).
+        // It's intended for both local development and CI.
+        project.tasks.register('integrationTestLegacy', Test) {
+            description = 'Runs the legacy integration tests.'
+            group = 'verification'
+            testClassesDirs = project.sourceSets.integrationTestLegacy.output.classesDirs
+            classpath = project.sourceSets.integrationTestLegacy.runtimeClasspath
+            useJUnitPlatform()
+            mustRunAfter project.tasks.check
+            // We need a docker image to run this task, so depend on assemble
+            dependsOn project.tasks.assemble
+        }
 
+        // For historical reasons (i.e. airbyte-ci), this task is called integrationTestJava.
+        // airbyte-ci only wants to run a task with exactly that name.
+        // This task is intended to run in CI, so it uses integrationTestDocker.
+        // There's intentionally no equivalent to run integrationTestNonDocker + integrationTestLegacy.
+        project.tasks.register('integrationTestJava') {
+            dependsOn project.tasks.integrationTestDocker
+            dependsOn project.tasks.integrationTestLegacy
+        }
         project.tasks.named('build').configure {
             dependsOn project.tasks.integrationTestJava
         }
@@ -169,8 +216,11 @@ class AirbyteBulkConnectorPlugin implements Plugin<Project> {
             testFixturesImplementation.extendsFrom implementation
             testFixturesRuntimeOnly.extendsFrom runtimeOnly
 
-            integrationTestJavaImplementation.extendsFrom testImplementation
-            integrationTestJavaRuntimeOnly.extendsFrom testRuntimeOnly
+            integrationTestImplementation.extendsFrom testImplementation
+            integrationTestRuntimeOnly.extendsFrom testRuntimeOnly
+
+            integrationTestLegacyImplementation.extendsFrom testImplementation
+            integrationTestLegacyRuntimeOnly.extendsFrom testRuntimeOnly
         }
 
         project.extensions.create('airbyteBulkConnector', AirbyteBulkConnectorExtension, project)
