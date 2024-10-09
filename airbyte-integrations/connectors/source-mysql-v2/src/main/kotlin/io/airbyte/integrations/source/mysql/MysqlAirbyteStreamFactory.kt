@@ -20,7 +20,10 @@ import javax.inject.Singleton
 
 @Singleton
 @Primary
-class MysqlJdbcStreamFactory(val base: JdbcAirbyteStreamFactory) : AirbyteStreamFactory by base {
+class MysqlAirbyteStreamFactory(
+    val base: JdbcAirbyteStreamFactory =
+        JdbcAirbyteStreamFactory(MysqlCDCMetaFields.entries.toSet())
+) : AirbyteStreamFactory by base {
     @Override
     override fun createGlobal(discoveredStream: DiscoveredStream): AirbyteStream {
         return AirbyteStreamFactory.createAirbyteStream(discoveredStream).apply {

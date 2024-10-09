@@ -10,20 +10,17 @@ import io.airbyte.cdk.jdbc.JsonStringFieldType
 import io.airbyte.cdk.jdbc.NCharacterStreamFieldType
 import io.airbyte.cdk.jdbc.NClobFieldType
 import io.airbyte.protocol.models.v0.SyncMode
-import jakarta.inject.Singleton
 
-@Singleton
-class JdbcAirbyteStreamFactory : AirbyteStreamFactory {
+class JdbcAirbyteStreamFactory(override val metaFields: Set<MetaField>) : AirbyteStreamFactory {
 
     override fun createGlobal(discoveredStream: DiscoveredStream) =
         AirbyteStreamFactory.createAirbyteStream(discoveredStream).apply {
             supportedSyncModes = listOf(SyncMode.FULL_REFRESH, SyncMode.INCREMENTAL)
             (jsonSchema["properties"] as ObjectNode).apply {
-                for (metaField in CommonMetaField.entries) {
+                for (metaField in metaFields) {
                     set<ObjectNode>(metaField.id, metaField.type.airbyteSchemaType.asJsonSchema())
                 }
             }
-            defaultCursorField = listOf(CommonMetaField.CDC_LSN.id)
             sourceDefinedCursor = true
             if (hasValidPrimaryKey(discoveredStream)) {
                 sourceDefinedPrimaryKey = discoveredStream.primaryKeyColumnIDs

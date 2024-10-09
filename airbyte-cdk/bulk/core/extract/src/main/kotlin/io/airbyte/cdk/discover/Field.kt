@@ -63,7 +63,6 @@ interface MetaField : FieldOrMetaField {
 enum class CommonMetaField(
     override val type: FieldType,
 ) : MetaField {
-    CDC_LSN(CdcStringMetaFieldType),
     CDC_UPDATED_AT(CdcOffsetDateTimeMetaFieldType),
     CDC_DELETED_AT(CdcOffsetDateTimeMetaFieldType),
     ;

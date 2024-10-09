@@ -6,10 +6,8 @@ package io.airbyte.integrations.source.mysql
 
 import io.airbyte.cdk.StreamIdentifier
 import io.airbyte.cdk.command.CliRunner
-import io.airbyte.cdk.discover.CommonMetaField
 import io.airbyte.cdk.discover.DiscoveredStream
 import io.airbyte.cdk.discover.Field
-import io.airbyte.cdk.discover.JdbcAirbyteStreamFactory
 import io.airbyte.cdk.jdbc.IntFieldType
 import io.airbyte.cdk.jdbc.JdbcConnectionFactory
 import io.airbyte.cdk.jdbc.StringFieldType
@@ -109,12 +107,14 @@ class MysqlCdcIntegrationTest {
                     columns = listOf(Field("k", IntFieldType), Field("v", StringFieldType)),
                     primaryKeyColumnIDs = listOf(listOf("k")),
                 )
-            val stream: AirbyteStream = JdbcAirbyteStreamFactory().createGlobal(discoveredStream)
+            val stream: AirbyteStream = MysqlAirbyteStreamFactory().createGlobal(discoveredStream)
             val configuredStream: ConfiguredAirbyteStream =
                 CatalogHelpers.toDefaultConfiguredStream(stream)
                     .withSyncMode(SyncMode.INCREMENTAL)
                     .withPrimaryKey(discoveredStream.primaryKeyColumnIDs)
-                    .withCursorField(listOf(CommonMetaField.CDC_LSN.id))
+                    .withCursorField(
+                        listOf(MysqlAirbyteStreamFactory.MysqlCDCMetaFields.CDC_CURSOR.id)
+                    )
             ConfiguredAirbyteCatalog().withStreams(listOf(configuredStream))
         }
 
